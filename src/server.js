@@ -24,8 +24,32 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 import expressLayouts from 'express-ejs-layouts';
+// --- 상단 import/초기화 부분 아래에 추가 ---
+import fs from 'fs';
+// EJS views 경로 자동 탐지 (src/views 우선, 없으면 프로젝트 루트/views)
+const viewsCandidates = [
+  path.join(__dirname, 'views'),
+  path.join(process.cwd(), 'views'),
+];
+
+const resolvedViewsDir = viewsCandidates.find(dir => fs.existsSync(dir));
+if (!resolvedViewsDir) {
+  console.warn('⚠️  views 디렉터리를 찾지 못했습니다. src/views 또는 프로젝트루트/views 위치를 확인하세요.');
+}
+app.set('views', resolvedViewsDir || path.join(__dirname, 'views'));
+
 app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
+
+// layout.ejs가 어디에 있는지도 점검
+const layoutCandidates = [
+  path.join(app.get('views') || '', 'layout.ejs'),
+  path.join(app.get('views') || '', 'layouts', 'layout.ejs'),
+];
+const hasLayout = layoutCandidates.some(p => fs.existsSync(p));
+if (!hasLayout) {
+  console.warn('⚠️  layout.ejs를 views/ 또는 views/layouts/ 아래에 두세요. 현재 파일을 찾지 못했습니다.');
+}
+app.set('layout', 'layout');
 
 app.use(expressLayouts);
 app.set('layout', 'layout');
@@ -63,6 +87,14 @@ async function hasUnseen(record, viewerType, viewerKey) {
   if (!seen) return true;
   return (record.updatedAt > seen.lastSeenAt);
 }
+
+// --- 미들웨어들 다음, 라우트들 맨 위 근처 ---
+app.get('/healthz', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
+
+// 템플릿 문제 시에도 살아있음을 확인할 수 있는 텍스트 루트
+app.get('/plain', (req, res) => {
+  res.type('text/plain').send('Service up (plain). If EJS fails, check /plain and logs.');
+});
 
 // ============ 1탭 ============
 app.get('/', (req, res) => {
@@ -332,4 +364,15 @@ app.get('/static/base.css', (req, res) => {
 // ============ 서버 시작 ============
 app.listen(PORT, () => {
   console.log(`🚀 http://localhost:${PORT}`);
+});
+
+// 404 핸들러
+app.use((req, res, next) => {
+  res.status(404).type('text/plain').send('404 Not Found (express). Check the URL or routes.');
+});
+
+// 에러 핸들러
+app.use((err, req, res, next) => {
+  console.error('💥 ERROR:', err);
+  res.status(500).type('text/plain').send('500 Internal Server Error.\n' + (err?.message || ''));
 });
