@@ -1,0 +1,32 @@
+<p class="pill">코드: <b><%= code %></b></p>
+<h3><%= record.student?.grade %>학년 <%= record.student?.klass %>반 <%= record.student?.number %>번 <%= record.student?.name %> - <%= record.subject %></h3>
+
+<h4>현재 내용</h4>
+<form method="POST" action="/r/<%= record._id %>/edit">
+  <textarea name="content" rows="10"><%= record.content %></textarea>
+  <div class="row">
+    <input name="note" placeholder="수정 메모(예: 오탈자 수정)" />
+    <input name="modifiedBy" placeholder="수정자 이름(예: 김교사)" />
+    <input type="hidden" name="viewerType" value="<%= viewerType %>" />
+    <% if (viewerType === 'student') { %>
+      <input type="hidden" name="studentCardCode" value="<%= studentCardCode %>" />
+    <% } else { %>
+      <input type="hidden" name="teacherId" value="<%= teacherId %>" />
+    <% } %>
+    <button>저장</button>
+  </div>
+</form>
+
+<h4>개정 이력</h4>
+<% if (!record.revisions?.length) { %>
+  <p>아직 이력이 없습니다.</p>
+<% } else { %>
+  <% record.revisions.slice().reverse().forEach(r => { %>
+    <div style="margin-bottom:16px;">
+      <div class="pill">v<%= r.version %></div>
+      <div>수정자: <b><%= r.modifiedBy || '-' %></b> / <%= dayjs(r.modifiedAt).format('YYYY-MM-DD HH:mm') %></div>
+      <div>메모: <%= r.note || '-' %></div>
+      <pre class="diff"><%= r.diffText %></pre>
+    </div>
+  <% }) %>
+<% } %>

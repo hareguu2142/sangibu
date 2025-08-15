@@ -1,0 +1,13 @@
+body { font-family: ui-sans-serif, system-ui, -apple-system; margin: 24px; }
+a { text-decoration: none; }
+.wrap { max-width: 1000px; margin: 0 auto; }
+.tabs a { margin-right: 12px; font-weight: 600; }
+.list { border-collapse: collapse; width: 100%; }
+.list th, .list td { border-bottom: 1px solid #ddd; padding: 8px 6px; }
+.pill { display:inline-block; padding:2px 8px; border-radius:999px; background:#eee; font-size:12px; }
+.hl { background: #fff6cc; }
+.row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+input, select, textarea { padding:8px; border:1px solid #ddd; border-radius:8px; width:100%; max-width:320px;}
+button { padding:8px 12px; border:0; border-radius:8px; background:#1f7aed; color:#fff; cursor:pointer; }
+button.secondary { background:#555; }
+pre.diff { background:#0b1020; color:#e3e7ff; padding:12px; border-radius:8px; overflow:auto; }

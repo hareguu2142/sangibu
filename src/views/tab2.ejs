@@ -1,0 +1,27 @@
+<p class="pill">코드: <b><%= code %></b> / 역할: <b><%= viewerType %></b></p>
+<table class="list">
+  <thead>
+    <tr>
+      <th>학년</th><th>반</th><th>번호</th><th>이름</th><th>과목</th><th>최종수정</th><th>열기</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% list.forEach(item => { %>
+      <tr class="<%= item.highlight ? 'hl' : '' %>">
+        <td><%= item.grade %></td>
+        <td><%= item.klass %></td>
+        <td><%= item.number %></td>
+        <td><%= item.name %></td>
+        <td><%= item.subject %></td>
+        <td><%= item.updatedAt %></td>
+        <td>
+          <a href="/r/<%= item.id %>?viewer=<%= viewerType %><%=
+            viewerType === 'student'
+            ? '&studentCardCode=' + encodeURIComponent(studentCardCode || '')
+            : '&teacherId=' + encodeURIComponent(teacherId || '')
+          %>">상세</a>
+        </td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>
