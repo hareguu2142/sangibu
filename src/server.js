@@ -81,6 +81,18 @@ app.listen(PORT, '0.0.0.0', () => {
   }
 })();
 
+// ---- 공용 async 에러래퍼 & DB 가드 ----
+const asyncHandler = (fn) => (req, res, next) =>
+  Promise.resolve(fn(req, res, next)).catch(next);
+
+function requireDb(req, res, next) {
+  // 1=connected, 2=connecting
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).type('text/plain').send('DB 연결 중입니다. 잠시 후 다시 시도하세요.');
+  }
+  next();
+}
+
 // 공용 헬퍼
 function viewKey(viewerType, studentCardCode, teacherId) {
   return viewerType === 'student' ? studentCardCode : teacherId;
@@ -195,14 +207,39 @@ app.get('/c/:code/new', async (req, res) => {
   });
 });
 
-// 새 기록 추가 (처리)
-app.post('/c/:code/new', async (req, res) => {
+// 새 기록 추가 (처리) - 교체
+app.post('/c/:code/new', requireDb, asyncHandler(async (req, res) => {
   const { code } = req.params;
   const { studentId, subject, content, teacherId } = req.body;
+
   const student = await Student.findById(studentId);
   if (!student || student.collectionCode !== code) {
     return res.status(400).send('잘못된 학생 정보');
   }
+
+  const query = { collectionCode: code, student: studentId, subject };
+
+  // 1) 이미 존재하면: 새로 만들지 말고 기존 문서로 이동(또는 업데이트)
+  let existing = await Record.findOne(query);
+  if (existing) {
+    // 여기서 바로 수정까지 하고 싶다면 아래 주석 해제
+    // const old = existing.content || '';
+    // const newC = content || '';
+    // const diffParts = Diff.createTwoFilesPatch('before', 'after', old, newC, '', '');
+    // const nextVer = (existing.revisions?.length || 0) + 1;
+    // existing.revisions.push({
+    //   version: nextVer,
+    //   diffText: diffParts,
+    //   note: '신규 추가 요청 → 기존 항목 업데이트',
+    //   modifiedBy: teacherId || 'unknown',
+    // });
+    // existing.content = newC;
+    // await existing.save();
+
+    return res.redirect(`/r/${existing._id}?viewer=teacher&teacherId=${encodeURIComponent(teacherId || '')}`);
+  }
+
+  // 2) 존재하지 않으면: 새로 생성
   const record = await Record.create({
     collectionCode: code,
     student: studentId,
@@ -210,13 +247,14 @@ app.post('/c/:code/new', async (req, res) => {
     content,
     revisions: [{
       version: 1,
-      diffText: Diff.createTwoFilesPatch('before', 'after', '', content, '', ''),
+      diffText: Diff.createTwoFilesPatch('before', 'after', '', content || '', '', ''),
       note: '최초 생성',
-      modifiedBy: teacherId,
+      modifiedBy: teacherId || 'unknown',
     }],
   });
-  res.redirect(`/r/${record._id}?viewer=teacher&teacherId=${encodeURIComponent(teacherId)}`);
-});
+
+  res.redirect(`/r/${record._id}?viewer=teacher&teacherId=${encodeURIComponent(teacherId || '')}`);
+}));
 
 
 // 관리자 탭 버튼 -> 4탭
@@ -299,9 +337,10 @@ app.get('/r/:id', async (req, res) => {
 });
 
 // 수정 반영 (내용 + 메모 + 수정자 이름)
-app.post('/r/:id/edit', async (req, res) => {
+app.post('/r/:id/edit', requireDb, asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { content, note, modifiedBy, viewerType, studentCardCode, teacherId } = req.body;
+
   const record = await Record.findById(id).populate('student');
   if (!record) return res.status(404).send('기록 없음');
 
@@ -314,13 +353,15 @@ app.post('/r/:id/edit', async (req, res) => {
     version: nextVer,
     diffText: diffParts,
     note: note || '',
-    modifiedBy: modifiedBy || 'unknown'
+    modifiedBy: modifiedBy || 'unknown',
   });
   record.content = newC;
   await record.save();
 
-  res.redirect(`/r/${id}?viewer=${viewerType}${viewerType==='student' ? `&studentCardCode=${encodeURIComponent(studentCardCode||'')}` : `&teacherId=${encodeURIComponent(teacherId||'')}`}`);
-});
+  res.redirect(`/r/${id}?viewer=${viewerType}${viewerType==='student'
+    ? `&studentCardCode=${encodeURIComponent(studentCardCode||'')}`
+    : `&teacherId=${encodeURIComponent(teacherId||'')}`}`);
+}));
 
 // ============ 4탭(관리자) ============
 

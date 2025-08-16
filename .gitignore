@@ -39,3 +39,6 @@ build
 .DS_Store
 *.swp
 *~
+
+# Nested git repository
+sangibu/
