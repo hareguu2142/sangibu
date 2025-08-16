@@ -59,15 +59,27 @@ app.use(express.json());
 app.use(methodOverride('_method'));
 app.use(morgan('dev'));
 
-const PORT = 3000;
+const PORT = parseInt(process.env.PORT || '8080', 10);
 const MONGODB_URI = process.env.MONGODB_URI;
 
-if (!MONGODB_URI) {
-  console.error('❌ .env의 MONGODB_URI를 설정하세요.');
-  process.exit(1);
-}
-await mongoose.connect(MONGODB_URI);
-console.log('✅ MongoDB connected');
+// 서버를 먼저 시작 (Cloud Run은 포트 오픈만 확인합니다)
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Listening on port ${PORT}`);
+});
+
+// 이후 DB 연결 (연결 실패해도 프로세스가 바로 죽지 않게)
+(async () => {
+  if (!MONGODB_URI) {
+    console.error('❌ MONGODB_URI가 비어 있습니다. App Hosting/Cloud Run 시크릿 또는 env로 설정하세요.');
+    return; // 필요시 process.exit(1)로 바꿔도 되지만, 디버깅 중엔 살아있게 둡니다.
+  }
+  try {
+    await mongoose.connect(MONGODB_URI);
+    console.log('✅ MongoDB connected');
+  } catch (e) {
+    console.error('❌ MongoDB 연결 실패:', e?.message || e);
+  }
+})();
 
 // 공용 헬퍼
 function viewKey(viewerType, studentCardCode, teacherId) {
@@ -463,11 +475,6 @@ app.post('/admin/:code/subjects/delete', checkAdminKey, async (req, res) => {
 
 // ============ Static Files ============
 app.use('/static', express.static(path.join(__dirname, 'static')));
-
-// ============ 서버 시작 ============
-app.listen(PORT, () => {
-  console.log(`🚀 http://localhost:${PORT}`);
-});
 
 // 404 핸들러
 app.use((req, res, next) => {
