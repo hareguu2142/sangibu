@@ -26,7 +26,18 @@
       <div class="pill">v<%= r.version %></div>
       <div>수정자: <b><%= r.modifiedBy || '-' %></b> / <%= dayjs(r.modifiedAt).format('YYYY-MM-DD HH:mm') %></div>
       <div>메모: <%= r.note || '-' %></div>
-      <pre class="diff"><%= r.diffText %></pre>
+      <div class="diff-container">
+        <% r.diffText.split('\n').slice(4).forEach(line => { %>
+          <% if (line.startsWith('\\ No newline at end of file')) return; %>
+          <% if (line.startsWith('+')) { %>
+            <div class="diff-line diff-add"><%= line.substring(1) %></div>
+          <% } else if (line.startsWith('-')) { %>
+            <div class="diff-line diff-remove"><%= line.substring(1) %></div>
+          <% } else { %>
+            <div class="diff-line"><%= line %></div>
+          <% } %>
+        <% }) %>
+      </div>
     </div>
   <% }) %>
 <% } %>

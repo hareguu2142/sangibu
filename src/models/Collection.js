@@ -4,6 +4,7 @@ const CollectionSchema = new mongoose.Schema({
   code: { type: String, unique: true, index: true },
   name: { type: String, required: true },
   adminKey: { type: String, default: 'admin' }, // 생성시에만 사용
+  subjects: { type: [String], default: ['국어', '수학'] },
 }, { timestamps: true });
 
 export default mongoose.model('Collection', CollectionSchema);

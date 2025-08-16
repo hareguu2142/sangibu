@@ -59,7 +59,7 @@ app.use(express.json());
 app.use(methodOverride('_method'));
 app.use(morgan('dev'));
 
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 const MONGODB_URI = process.env.MONGODB_URI;
 
 if (!MONGODB_URI) {
@@ -101,6 +101,35 @@ app.get('/', (req, res) => {
   res.render('tab1', { title: '생활기록부 - 입장/생성' });
 });
 
+// ============ 공유 탭 ============
+app.get('/collections/share', (req, res) => {
+  res.render('tab_share', { title: '생활기록부 - 공유' });
+});
+
+app.post('/collections/share', async (req, res) => {
+  try {
+    const { studentName, studentCardCode, collectionCode } = req.body;
+    // Basic validation
+    if (!studentName || !studentCardCode || !collectionCode) {
+      return res.status(400).send('모든 필드를 입력해주세요.');
+    }
+
+    // Here you would typically add logic to handle the sharing,
+    // for example, creating a shareable link or sending a notification.
+    // For now, we'll just redirect back to the share page with a success message.
+    // NOTE: A full implementation would require more complex logic.
+    console.log(`Sharing collection ${collectionCode} with student ${studentName} (${studentCardCode})`);
+
+    // Redirect or render a success page
+    res.send(`'${collectionCode}' 생활기록부를 학생 '${studentName}'에게 공유하는 기능은 아직 구현되지 않았습니다. 하지만 UI는 준비되었습니다.`);
+
+  } catch (error) {
+    console.error('Share error:', error);
+    res.status(500).send('공유 처리 중 오류가 발생했습니다.');
+  }
+});
+
+
 // 생성: adminKey + name + code
 app.post('/collections/create', async (req, res) => {
   try {
@@ -137,6 +166,46 @@ app.post('/collections/join-teacher', async (req, res) => {
   // if (!t) return res.status(403).send('등록되지 않은 교사입니다.');
   res.redirect(`/c/${encodeURIComponent(code)}?viewer=teacher&teacherId=${encodeURIComponent(teacherId)}`);
 });
+
+// 새 기록 추가 (폼)
+app.get('/c/:code/new', async (req, res) => {
+  const { code } = req.params;
+  const { teacherId } = req.query;
+  const coll = await Collection.findOne({ code });
+  if (!coll) return res.status(404).send('없는 코드');
+  const students = await Student.find({ collectionCode: code }).sort({ grade: 1, klass: 1, number: 1 });
+  res.render('tab5_new_record', {
+    title: '새 기록 추가',
+    code,
+    teacherId,
+    students,
+    subjects: coll.subjects,
+  });
+});
+
+// 새 기록 추가 (처리)
+app.post('/c/:code/new', async (req, res) => {
+  const { code } = req.params;
+  const { studentId, subject, content, teacherId } = req.body;
+  const student = await Student.findById(studentId);
+  if (!student || student.collectionCode !== code) {
+    return res.status(400).send('잘못된 학생 정보');
+  }
+  const record = await Record.create({
+    collectionCode: code,
+    student: studentId,
+    subject,
+    content,
+    revisions: [{
+      version: 1,
+      diffText: Diff.createTwoFilesPatch('before', 'after', '', content, '', ''),
+      note: '최초 생성',
+      modifiedBy: teacherId,
+    }],
+  });
+  res.redirect(`/r/${record._id}?viewer=teacher&teacherId=${encodeURIComponent(teacherId)}`);
+});
+
 
 // 관리자 탭 버튼 -> 4탭
 app.get('/admin', (req, res) => {
@@ -242,53 +311,79 @@ app.post('/r/:id/edit', async (req, res) => {
 });
 
 // ============ 4탭(관리자) ============
+
+// Admin용 미들웨어
+async function checkAdminKey(req, res, next) {
+  const { code } = req.params;
+  const { adminKey } = req.query;
+  const coll = await Collection.findOne({ code });
+  if (!coll) return res.status(404).send('없는 코드');
+  if (adminKey !== coll.adminKey) {
+    return res.status(403).send('접근 권한이 없습니다. Admin Key를 확인하세요.');
+  }
+  next();
+}
+
 app.get('/admin/:code', async (req, res) => {
   const { code } = req.params;
-  const tab = req.query.tab || 'students';
   const coll = await Collection.findOne({ code });
   if (!coll) return res.status(404).send('없는 코드');
 
+  // adminKey 체크를 제거하고 바로 관리자 페이지를 보여줌
+  const tab = req.query.tab || 'students';
   const students = await Student.find({ collectionCode: code }).sort({ grade:1, klass:1, number:1 });
   const teachers = await Teacher.find({ collectionCode: code }).sort({ createdAt: -1 });
 
   res.render('tab4', {
     title: `관리자 설정 - ${coll.name} (${code})`,
     code,
+    needsAuth: false, // 항상 false로 설정하여 인증 폼을 숨김
+    error: null,
     tab,
     students,
-    teachers
+    teachers,
+    subjects: coll.subjects,
+    adminKey: coll.adminKey, // DB에서 가져온 adminKey를 템플릿에 전달
   });
 });
 
 // 학생 추가
-app.post('/admin/:code/students', async (req, res) => {
+app.post('/admin/:code/students', checkAdminKey, async (req, res) => {
   const { code } = req.params;
+  const { adminKey } = req.query;
   const { grade, klass, number, name, studentCardCode } = req.body;
+  const coll = await Collection.findOne({ code });
+  if (!coll) return res.status(404).send('없는 코드');
+
   await Student.create({ collectionCode: code, grade, klass, number, name, studentCardCode });
   // 기본 과목 샘플 2개 생성(중복 방지)
   const st = await Student.findOne({ collectionCode: code, studentCardCode });
-  for (const subj of ['국어', '수학']) {
+  for (const subj of coll.subjects) {
     await Record.updateOne(
       { collectionCode: code, student: st._id, subject: subj },
       { $setOnInsert: { content: '', revisions: [] } },
       { upsert: true }
     );
   }
-  res.redirect(`/admin/${code}?tab=students`);
+  res.redirect(`/admin/${code}?tab=students&adminKey=${adminKey}`);
 });
 
 // 학생 삭제
-app.post('/admin/:code/students/:id/delete', async (req, res) => {
+app.post('/admin/:code/students/:id/delete', checkAdminKey, async (req, res) => {
   const { code, id } = req.params;
+  const { adminKey } = req.query;
   await Record.deleteMany({ collectionCode: code, student: id });
   await Student.findByIdAndDelete(id);
-  res.redirect(`/admin/${code}?tab=students`);
+  res.redirect(`/admin/${code}?tab=students&adminKey=${adminKey}`);
 });
 
 // CSV 업로드 (UTF-8, 헤더: 학년,반,번호,이름,학생증코드)
-app.post('/admin/:code/students/upload', upload.single('csv'), async (req, res) => {
+app.post('/admin/:code/students/upload', checkAdminKey, upload.single('csv'), async (req, res) => {
   const { code } = req.params;
+  const { adminKey } = req.query;
   if (!req.file) return res.status(400).send('CSV 파일이 없습니다.');
+  const coll = await Collection.findOne({ code });
+  if (!coll) return res.status(404).send('없는 코드');
   try {
     const rows = [];
     await new Promise((resolve, reject) => {
@@ -313,7 +408,7 @@ app.post('/admin/:code/students/upload', upload.single('csv'), async (req, res) 
         { $set: { grade, klass, number, name } },
         { upsert: true, new: true }
       );
-      for (const subj of ['국어', '수학']) {
+      for (const subj of coll.subjects) {
         await Record.updateOne(
           { collectionCode: code, student: stu._id, subject: subj },
           { $setOnInsert: { content: '', revisions: [] } },
@@ -321,45 +416,53 @@ app.post('/admin/:code/students/upload', upload.single('csv'), async (req, res) 
         );
       }
     }
-    res.redirect(`/admin/${code}?tab=students`);
+    res.redirect(`/admin/${code}?tab=students&adminKey=${adminKey}`);
   } catch (e) {
     res.status(500).send('CSV 처리 오류: ' + e.message);
   }
 });
 
 // 교사 추가
-app.post('/admin/:code/teachers', async (req, res) => {
+app.post('/admin/:code/teachers', checkAdminKey, async (req, res) => {
   const { code } = req.params;
+  const { adminKey } = req.query;
   const { teacherId, name } = req.body;
   await Teacher.create({ collectionCode: code, teacherId, name });
-  res.redirect(`/admin/${code}?tab=teachers`);
+  res.redirect(`/admin/${code}?tab=teachers&adminKey=${adminKey}`);
 });
 
 // 교사 삭제
-app.post('/admin/:code/teachers/:id/delete', async (req, res) => {
+app.post('/admin/:code/teachers/:id/delete', checkAdminKey, async (req, res) => {
   const { code, id } = req.params;
+  const { adminKey } = req.query;
   await Teacher.findByIdAndDelete(id);
-  res.redirect(`/admin/${code}?tab=teachers`);
+  res.redirect(`/admin/${code}?tab=teachers&adminKey=${adminKey}`);
 });
 
-// ============ 간단 CSS ============
-app.get('/static/base.css', (req, res) => {
-  res.type('text/css').send(`
-  body { font-family: ui-sans-serif, system-ui, -apple-system; margin: 24px; }
-  a { text-decoration: none; }
-  .wrap { max-width: 1000px; margin: 0 auto; }
-  .tabs a { margin-right: 12px; font-weight: 600; }
-  .list { border-collapse: collapse; width: 100%; }
-  .list th, .list td { border-bottom: 1px solid #ddd; padding: 8px 6px; }
-  .pill { display:inline-block; padding:2px 8px; border-radius:999px; background:#eee; font-size:12px; }
-  .hl { background: #fff6cc; }
-  .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
-  input, select, textarea { padding:8px; border:1px solid #ddd; border-radius:8px; width:100%; max-width:320px;}
-  button { padding:8px 12px; border:0; border-radius:8px; background:#1f7aed; color:#fff; cursor:pointer; }
-  button.secondary { background:#555; }
-  pre.diff { background:#0b1020; color:#e3e7ff; padding:12px; border-radius:8px; overflow:auto; }
-  `);
+// 과목 추가
+app.post('/admin/:code/subjects', checkAdminKey, async (req, res) => {
+  const { code } = req.params;
+  const { adminKey } = req.query;
+  const { subject } = req.body;
+  if (subject) {
+    await Collection.updateOne({ code }, { $addToSet: { subjects: subject } });
+  }
+  res.redirect(`/admin/${code}?tab=subjects&adminKey=${adminKey}`);
 });
+
+// 과목 삭제
+app.post('/admin/:code/subjects/delete', checkAdminKey, async (req, res) => {
+  const { code } = req.params;
+  const { adminKey } = req.query;
+  const { subject } = req.body;
+  if (subject) {
+    await Collection.updateOne({ code }, { $pull: { subjects: subject } });
+  }
+  res.redirect(`/admin/${code}?tab=subjects&adminKey=${adminKey}`);
+});
+
+// ============ Static Files ============
+app.use('/static', express.static(path.join(__dirname, 'static')));
 
 // ============ 서버 시작 ============
 app.listen(PORT, () => {

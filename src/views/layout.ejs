@@ -4,6 +4,21 @@
   <meta charset="UTF-8" />
   <title><%= title %></title>
   <link rel="stylesheet" href="/static/base.css" />
+  <script>
+    function promptForAdmin(code) {
+      const adminCode = prompt("코드를 입력하세요:");
+      if (adminCode === null) return; 
+
+      const adminKey = prompt("admin을 입력하세요:");
+      if (adminKey === null) return;
+
+      if (adminCode === code && adminKey === "admin") {
+        window.location.href = "/admin/" + code + "?adminKey=admin";
+      } else {
+        alert("코드 또는 admin이 잘못되었습니다.");
+      }
+    }
+  </script>
 </head>
 <body>
   <div class="wrap">
@@ -11,8 +26,9 @@
     <div class="tabs">
       <a href="/">① 입장/생성</a>
       <% if (typeof code !== 'undefined') { %>
-        <a href="/c/<%= code %>?viewer=student">② 공유 리스트</a>
-        <a href="/admin/<%= code %>">④ 관리자</a>
+        <% if (typeof viewerType !== 'undefined' && viewerType === 'teacher') { %>
+          <a href="javascript:void(0);" onclick="promptForAdmin('<%= code %>')">④ 관리자</a>
+        <% } %>
       <% } %>
     </div>
     <hr />

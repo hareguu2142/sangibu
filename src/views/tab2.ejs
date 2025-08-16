@@ -1,4 +1,11 @@
 <p class="pill">코드: <b><%= code %></b> / 역할: <b><%= viewerType %></b></p>
+
+<% if (viewerType === 'teacher') { %>
+  <div style="margin: 16px 0;">
+    <a href="/c/<%= code %>/new?teacherId=<%= encodeURIComponent(teacherId) %>"><button>+ 새 기록 추가</button></a>
+  </div>
+<% } %>
+
 <table class="list">
   <thead>
     <tr>

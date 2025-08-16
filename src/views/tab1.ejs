@@ -1,29 +1,41 @@
-<div class="row">
-  <form method="POST" action="/collections/join">
-    <h3>학생 입장</h3>
-    <input name="code" placeholder="코드" required />
-    <input name="studentCardCode" placeholder="학생증번호(코드)" required />
-    <button>입장</button>
-  </form>
+<div class="main-actions">
+  <div class="action-card">
+    <form method="POST" action="/collections/join">
+      <h3>학생 입장</h3>
+      <input name="code" placeholder="접속 코드" required />
+      <input name="studentCardCode" placeholder="학생증번호" required />
+      <button>입장</button>
+    </form>
+  </div>
 
-  <form method="POST" action="/collections/join-teacher">
-    <h3>교사 입장</h3>
-    <input name="code" placeholder="코드" required />
-    <input name="teacherId" placeholder="교사고유번호" required />
-    <button>교사 권한 입장</button>
-  </form>
-
-  <form method="POST" action="/collections/create">
-    <h3>공유 탭 생성</h3>
-    <input name="adminKey" placeholder="admin" value="admin" required />
-    <input name="name" placeholder="공유탭 이름(예: 1학년 생활기록부)" required />
-    <input name="code" placeholder="접속 코드(예: test)" required />
-    <button>생성</button>
-  </form>
+  <div class="action-card">
+    <form method="POST" action="/collections/join-teacher">
+      <h3>교사 입장</h3>
+      <input name="code" placeholder="접속 코드" required />
+      <input name="teacherId" placeholder="교사고유번호" required />
+      <button>교사 권한 입장</button>
+    </form>
+  </div>
 </div>
 
-<form method="GET" action="/admin">
-  <h3>관리자 탭 이동</h3>
-  <input name="code" placeholder="코드" required />
-  <button class="secondary">관리자</button>
-</form>
+<div class="secondary-actions">
+  <details>
+    <summary>기타 기능</summary>
+    <div class="secondary-forms">
+      <form method="POST" action="/collections/create">
+        <h3>공유 탭 생성</h3>
+        <input name="adminKey" placeholder="관리자페이지 접근 코드" required />
+        <input name="name" placeholder="공유탭 이름(예: 1학년 2학기 생활기록부)" required />
+        <input name="code" placeholder="접속 코드(예: test)" required />
+        <button>생성</button>
+      </form>
+
+      <form method="GET" action="/admin">
+        <h3>관리자 탭 이동</h3>
+        <input name="adminKey" placeholder="관리자페이지 접근 코드" required />
+        <input name="code" placeholder="접속 코드" required />
+        <button class="secondary">관리자</button>
+      </form>
+    </div>
+  </details>
+</div>

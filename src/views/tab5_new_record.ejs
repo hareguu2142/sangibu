@@ -1,0 +1,25 @@
+<h3>새 기록 추가</h3>
+<form method="POST" action="/c/<%= code %>/new">
+  <input type="hidden" name="teacherId" value="<%= teacherId %>" />
+  <div style="margin-bottom: 12px;">
+    <label>학생</label>
+    <select name="studentId" required>
+      <% students.forEach(s => { %>
+        <option value="<%= s._id %>"><%= s.grade %>학년 <%= s.klass %>반 <%= s.number %>번 <%= s.name %></option>
+      <% }) %>
+    </select>
+  </div>
+  <div style="margin-bottom: 12px;">
+    <label>과목</label>
+    <select name="subject" required>
+      <% subjects.forEach(s => { %>
+        <option value="<%= s %>"><%= s %></option>
+      <% }) %>
+    </select>
+  </div>
+  <div style="margin-bottom: 12px;">
+    <label>내용</label>
+    <textarea name="content" rows="10" placeholder="내용을 입력하세요..."></textarea>
+  </div>
+  <button>저장</button>
+</form>
