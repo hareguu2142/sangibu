@@ -1,0 +1,6 @@
+# apphosting.yaml
+env:
+  - variable: MONGODB_URI
+    secret: MONGODB_URI
+    availability:
+      - RUNTIME
